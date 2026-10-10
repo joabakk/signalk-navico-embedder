@@ -1,3 +1,8 @@
+# v1.6.1 (2026-10-11)
+
+- **Fixed a socket leak in tile announcements.** Each announcement opens a UDP socket bound to the announced IP; if that bind failed (e.g. the IP override holds an address the server doesn't have, or the machine's address changed), `'listening'` never fired and the socket was never closed — one leaked every 10 s until the server hit its open-files limit (EMFILE) and stopped accepting connections. The socket now has an `'error'` handler that logs the failure and closes it, so a wrong override shows up as an error in the server log instead (#12, thanks @superstar76)
+- Documentation: added the Simrad NSS evo3S 12 to the verified hardware table (#13, thanks @superstar76)
+
 # v1.6.0 (2026-07-12)
 
 - **Reworked the MFD Apps config panel into separate Enabled and Disabled lists.** Apps now render in two labeled, count-badged drop zones instead of one list with per-row checkboxes: drag an app between the lists to enable/disable it, or drag within a list to reorder. Enabling drops an app at the bottom of the Enabled group and disabling drops it at the top of the Disabled group, so the underlying `apps` array stays ordered `[...enabled, ...disabled]` — which is also the order enabled apps are announced to the MFD. Larger (48px) icons, and the per-app "Description" input was dropped from the rows
