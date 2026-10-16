@@ -1,3 +1,7 @@
+# v1.7.0 (2026-10-16)
+
+- **Tile announcements are now also sent as a subnet broadcast, for MFDs on WiFi.** Some MFDs connected over WiFi (confirmed on B&G Zeus3S) ignore the multicast announcement to `239.2.1.1` but accept the same payload sent as a broadcast. Each announcement now goes to both the multicast group and the announced interface's subnet broadcast address (e.g. `192.168.1.255:2053`), with no new config option. Wired MFDs receive both copies, which is harmless — announcements are idempotent and already repeat every 10 s. The broadcast address is derived from the netmask of the interface holding the announced IP rather than `255.255.255.255`, which could leave on the wrong interface on multi-homed hosts; no broadcast is sent if the IP isn't on a local non-loopback interface or the subnet is a /31 or /32. Added unit tests for `getBroadcastAddress` and a server test checking both packets carry identical payloads (#14)
+
 # v1.6.1 (2026-10-11)
 
 - **Fixed a socket leak in tile announcements.** Each announcement opens a UDP socket bound to the announced IP; if that bind failed (e.g. the IP override holds an address the server doesn't have, or the machine's address changed), `'listening'` never fired and the socket was never closed — one leaked every 10 s until the server hit its open-files limit (EMFILE) and stopped accepting connections. The socket now has an `'error'` handler that logs the failure and closes it, so a wrong override shows up as an error in the server log instead (#12, thanks @superstar76)
