@@ -197,6 +197,26 @@ function getLocalIp() {
   return '127.0.0.1';
 }
 
+// Subnet-directed broadcast address (e.g. 192.168.1.255) of the non-internal IPv4
+// interface holding `ip`, or null if no such interface exists. Some MFDs on WiFi
+// ignore the multicast announcement but accept the same payload as a subnet
+// broadcast (#14), so announcements go to both. `ifaces` defaults to the live
+// interface table and is injectable for tests.
+function getBroadcastAddress(ip, ifaces = os.networkInterfaces()) {
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name] || []) {
+      if (iface.family !== 'IPv4' || iface.internal || iface.address !== ip) continue;
+      const addr = ip.split('.').map(Number);
+      const mask = (iface.netmask || '').split('.').map(Number);
+      if (addr.length !== 4 || mask.length !== 4 || mask.some((n) => !(n >= 0 && n <= 255))) return null;
+      // A /31 or /32 has no broadcast address.
+      if (mask[3] >= 254) return null;
+      return addr.map((n, i) => (n | (~mask[i] & 255))).join('.');
+    }
+  }
+  return null;
+}
+
 // The bundled fallback icon (shipped under public/), resolved once at load time.
 const FALLBACK_ICON = [
   { file: path.join('public', 'icon.ico'), mime: 'image/x-icon' },
@@ -527,19 +547,34 @@ module.exports = function (app) {
           }
         });
         socket.once('listening', () => {
-          let pending = apps.length;
+          // Send to the multicast group and, when the interface has one, its subnet
+          // broadcast address too — see getBroadcastAddress.
+          const broadcast = getBroadcastAddress(ip);
+          const targets = [MULTICAST_GROUP];
+          if (broadcast) {
+            try {
+              socket.setBroadcast(true);
+              targets.push(broadcast);
+            } catch (err) {
+              app.error(`Could not enable broadcast on ${ip}: ${err.message}`);
+            }
+          }
+          let pending = apps.length * targets.length;
           const done = () => {
             if (--pending <= 0) socket.close();
           };
           for (const app2 of apps) {
-            socket.send(buildAnnouncement(ip, app2), PUBLISH_PORT, MULTICAST_GROUP, (err) => {
-              if (err) {
-                app.error(`Multicast send error: ${err.message}`);
-              } else {
-                app.debug(`Announced tile "${app2.label}" -> ${app2.tileUrl}`);
-              }
-              done();
-            });
+            const message = buildAnnouncement(ip, app2);
+            for (const target of targets) {
+              socket.send(message, PUBLISH_PORT, target, (err) => {
+                if (err) {
+                  app.error(`Announcement send error to ${target}: ${err.message}`);
+                } else {
+                  app.debug(`Announced tile "${app2.label}" -> ${app2.tileUrl} via ${target}`);
+                }
+                done();
+              });
+            }
           }
         });
         socket.bind(PUBLISH_PORT, ip);
@@ -817,6 +852,7 @@ module.exports = function (app) {
 // the server only ever calls the factory function exported above.
 module.exports.internal = {
   getLocalIp,
+  getBroadcastAddress,
   getServerPort,
   buildAnnouncement,
   buildAppModel,

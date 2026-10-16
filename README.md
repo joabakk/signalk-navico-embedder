@@ -5,7 +5,7 @@ A SignalK plugin that presents your installed Signal K web apps as webapp tiles 
 ## What it does
 
 1. Runs an HTTP reverse proxy that forwards requests to the local Signal K server
-2. Broadcasts UDP multicast announcements that tell the MFD to show a tile for each selected web app
+2. Sends UDP announcements (multicast, plus a subnet broadcast for MFDs on WiFi) that tell the MFD to show a tile for each selected web app
 3. Patches the proxied HTML, JS, and CSS to be compatible with the MFD's old Chromium browser
 
 The embedded configurator can **auto-detect installed Signal K webapps**, so you just click _Discover_ and enable the ones you want on the MFD.

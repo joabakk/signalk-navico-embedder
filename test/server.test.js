@@ -10,6 +10,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const dgram = require('node:dgram');
+const os = require('node:os');
 
 const plugin = require('../index.js');
 const { FALLBACK_ICON_ROUTE, LAUNCHER_PATH } = plugin.internal;
@@ -113,6 +114,7 @@ function fakeDgram() {
       bind() {
         if (onListening) setImmediate(onListening);
       },
+      setBroadcast() {},
       send(message, port, group, cb) {
         sent.push({ message: message.toString(), port, group });
         if (cb) cb(null);
@@ -552,6 +554,25 @@ test('publishes the webapps delta and announces a tile per enabled app', async (
     assert.ok(ctx.app.calls.status.at(-1).includes('Announcing 2 tile(s)'));
   } finally {
     await ctx.cleanup();
+  }
+});
+
+test('also announces each tile to the subnet broadcast address of the announced interface', async () => {
+  // Pretend 127.0.0.1 is a real LAN interface so a broadcast address is derived.
+  const originalIfaces = os.networkInterfaces;
+  os.networkInterfaces = () => ({
+    eth0: [{ family: 'IPv4', internal: false, address: '127.0.0.1', netmask: '255.255.255.0' }],
+  });
+  try {
+    const ctx = await setup({ options: { apps: [{ enabled: true, url: '/foo/', label: 'Foo' }] } });
+    try {
+      assert.deepEqual(ctx.sent.map((s) => s.group).sort(), ['127.0.0.255', '239.2.1.1']);
+      assert.equal(ctx.sent[0].message, ctx.sent[1].message);
+    } finally {
+      await ctx.cleanup();
+    }
+  } finally {
+    os.networkInterfaces = originalIfaces;
   }
 });
 

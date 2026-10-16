@@ -20,6 +20,7 @@ test('module exports a plugin factory and pure internal helpers', () => {
   assert.equal(typeof plugin.internal, 'object');
   for (const name of [
     'getLocalIp',
+    'getBroadcastAddress',
     'getServerPort',
     'buildAnnouncement',
     'buildAppModel',

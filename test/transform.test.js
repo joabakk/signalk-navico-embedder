@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const { internal } = require('../index.js');
 const {
+  getBroadcastAddress,
   getServerPort,
   buildAnnouncement,
   buildAppModel,
@@ -182,4 +183,22 @@ test('applyGlyphFallbacks leaves already-safe arrows and unrelated text untouche
   assert.equal(applyGlyphFallbacks('Rising ↗ Falling ↘'), 'Rising ↗ Falling ↘');
   assert.equal(applyGlyphFallbacks('plain text, no icons'), 'plain text, no icons');
   assert.equal(applyGlyphFallbacks(''), '');
+});
+
+test('getBroadcastAddress derives the subnet broadcast of the interface holding the IP', () => {
+  const ifaces = {
+    lo: [{ family: 'IPv4', internal: true, address: '127.0.0.1', netmask: '255.0.0.0' }],
+    eth0: [
+      { family: 'IPv6', internal: false, address: 'fe80::1', netmask: 'ffff:ffff:ffff:ffff::' },
+      { family: 'IPv4', internal: false, address: '192.168.1.42', netmask: '255.255.255.0' },
+    ],
+    wlan0: [{ family: 'IPv4', internal: false, address: '10.10.5.7', netmask: '255.255.252.0' }],
+    ptp0: [{ family: 'IPv4', internal: false, address: '10.0.0.1', netmask: '255.255.255.254' }],
+  };
+  assert.equal(getBroadcastAddress('192.168.1.42', ifaces), '192.168.1.255');
+  assert.equal(getBroadcastAddress('10.10.5.7', ifaces), '10.10.7.255');
+  // Loopback, /31 links, and addresses not on this machine get no broadcast.
+  assert.equal(getBroadcastAddress('127.0.0.1', ifaces), null);
+  assert.equal(getBroadcastAddress('10.0.0.1', ifaces), null);
+  assert.equal(getBroadcastAddress('192.168.1.99', ifaces), null);
 });

@@ -17,6 +17,8 @@ The MFD listens for **UDP multicast packets** on:
 
 Every 10 seconds this plugin sends a JSON payload to that group advertising the proxy URL. The MFD opens that URL in its browser panel when the tile is tapped.
 
+The same payload is also sent to the announced interface's **subnet broadcast address** (e.g. `192.168.1.255:2053`). Some MFDs connected over WiFi (confirmed on B&G Zeus3S) ignore the multicast packet but accept the broadcast one (#14). Wired MFDs receive both copies, which is harmless: announcements are idempotent and repeat every 10 seconds anyway. No broadcast is sent if the announced IP isn't on a local non-loopback interface or the subnet is a /31 or /32.
+
 Key rules:
 
 - The **`IP` field must exactly match the source IP the UDP socket is bound to**. The MFD validates this.
